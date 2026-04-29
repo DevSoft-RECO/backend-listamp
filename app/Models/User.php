@@ -30,7 +30,7 @@ class User extends Authenticatable
         'jti',
     ];
 
-    public $incrementing = false; // IDs sincronizados con Ecosistema Madre
+    public $incrementing = true; // El ID ahora es autoincrementable para usuarios locales nuevos
     public $timestamps = false; // Sincronización manual en login
 
 

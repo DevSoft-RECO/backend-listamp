@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id(); // Sincronizado con ID de Ecosistema Madre
             $table->string('name');
             $table->string('username')->unique()->nullable();
-            $table->string('email')->unique();
+            $table->string('email')->nullable();
             $table->string('telefono')->nullable();
             $table->unsignedBigInteger('id_agencia')->nullable();
             $table->string('avatar')->nullable();

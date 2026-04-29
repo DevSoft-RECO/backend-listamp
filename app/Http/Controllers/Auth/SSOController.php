@@ -14,7 +14,7 @@ class SSOController extends Controller
     /**
      * Sincroniza el perfil JIT (Just-In-Time) con la App Madre.
      * Esta función es el corazón del ecosistema para obtener identidad, roles y permisos.
-     * 
+     *
      * @param Request $request
      * @return JsonResponse
      */
@@ -37,7 +37,7 @@ class SSOController extends Controller
             }
 
             $userData = $response->json();
-            
+
             // Desempaquetar si viene en 'data' (Laravel Resources)
             if (isset($userData['data'])) {
                 $userData = $userData['data'];
@@ -46,7 +46,7 @@ class SSOController extends Controller
             // 2. APLANAMIENTO CRÍTICO (Spatie Objects -> Simple Strings)
             $userData['roles'] = $this->flatten($userData['roles'] ?? []);
             $userData['permisos'] = $this->flatten($userData['permisos'] ?? []);
-            
+
             // 3. Extracción de JTI del Token (para mirroring con Go)
             $jti = null;
             $tokenParts = explode('.', $token);
@@ -56,7 +56,7 @@ class SSOController extends Controller
             }
 
             // 4. SINCRONIZACIÓN JIT (Just-In-Time)
-            
+
             // Upsert Agencia
             if (isset($userData['agencia'])) {
                 $agData = $userData['agencia'];
@@ -71,21 +71,31 @@ class SSOController extends Controller
                 );
             }
 
-            // Upsert User
-            User::updateOrCreate(
-                ['id' => $userData['id']],
-                [
-                    'name'             => $userData['name'],
-                    'username'         => $userData['username'] ?? null,
-                    'email'            => $userData['email'],
-                    'telefono'         => $userData['telefono'] ?? null,
-                    'id_agencia'       => $userData['idagencia'] ?? null,
-                    'avatar'           => $userData['avatar'] ?? null,
-                    'roles_list'       => $userData['roles'],
-                    'permissions_list' => $userData['permisos'],
-                    'jti'              => $jti,
-                ]
-            );
+            // Upsert User (Link via Username, Case-Insensitive)
+            $username = $userData['username'] ?? '';
+
+            $user = User::whereRaw('LOWER(username) = ?', [strtolower($username)])->first();
+
+            $updateData = [
+                'name'             => $userData['name'],
+                'email'            => $userData['email'],
+                'telefono'         => $userData['telefono'] ?? null,
+                'id_agencia'       => $userData['idagencia'] ?? null,
+                'avatar'           => $userData['avatar'] ?? null,
+                'roles_list'       => $userData['roles'],
+                'permissions_list' => $userData['permisos'],
+                'jti'              => $jti,
+            ];
+
+            if ($user) {
+                // Si existe localmente, actualizamos datos pero conservamos el ID original
+                $user->update($updateData);
+            } else {
+                // Si es un usuario nuevo, NO tomamos el ID de la madre para evitar choques con IDs locales
+                // La base de datos le asignará automáticamente el siguiente ID autoincrementable
+                $updateData['username'] = strtoupper($username); // Estandarizamos a mayúsculas
+                $user = User::create($updateData);
+            }
 
             // 5. Fallbacks de estandarización para el Frontend
             $userData['roles_list'] = $userData['roles'];
@@ -104,7 +114,7 @@ class SSOController extends Controller
 
     /**
      * Convierte colecciones de objetos de roles/permisos (Spatie) en arreglos de strings.
-     * 
+     *
      * @param mixed $items
      * @return array
      */
