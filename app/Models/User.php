@@ -55,4 +55,12 @@ class User extends Authenticatable
             'permissions_list' => 'array',
         ];
     }
+
+    /**
+     * Get the agency associated with the user.
+     */
+    public function agencia()
+    {
+        return $this->belongsTo(Agencia::class, 'id_agencia');
+    }
 }

@@ -33,13 +33,19 @@ class ValidateSSO
             // Decodificar Token con RS256
             $decoded = JWT::decode($token, new Key($publicKey, 'RS256'));
 
-            // Inyectar usuario en la sesión de Laravel (Memoria)
-            $user = new GenericUser([
-                'id' => $decoded->sub,
-                'token_scopes' => $decoded->scopes ?? [],
-            ]);
+            // Intentar cargar el usuario real de la base de datos local
+            $dbUser = \App\Models\User::find($decoded->sub);
 
-            Auth::setUser($user);
+            if ($dbUser) {
+                Auth::setUser($dbUser);
+            } else {
+                // Si no existe localmente aún, usar GenericUser como respaldo temporal
+                $user = new \Illuminate\Auth\GenericUser([
+                    'id' => $decoded->sub,
+                    'token_scopes' => $decoded->scopes ?? [],
+                ]);
+                Auth::setUser($user);
+            }
 
         } catch (\Exception $e) {
             return response()->json(['message' => 'Acceso Denegado: ' . $e->getMessage()], 401);

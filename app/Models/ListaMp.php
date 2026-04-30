@@ -45,4 +45,21 @@ class ListaMp extends Model
     {
         return $query->where('estado', '1');
     }
+
+    public function scopeSearchFilter($query, $searchValue)
+    {
+        if (!$searchValue || strlen(trim($searchValue)) < 6) {
+            return $query;
+        }
+
+        $searchValue = trim($searchValue);
+        $cleanSearchValue = str_replace([' ', '-'], '', $searchValue);
+
+        return $query->where(function ($q) use ($searchValue, $cleanSearchValue) {
+            $q->where('nombre', 'LIKE', "%{$searchValue}%")
+              ->orWhereRaw("REPLACE(REPLACE(cui, ' ', ''), '-', '') LIKE ?", ["%{$cleanSearchValue}%"])
+              ->orWhereRaw("REPLACE(REPLACE(pasaporte, ' ', ''), '-', '') LIKE ?", ["%{$cleanSearchValue}%"])
+              ->orWhereRaw("REPLACE(REPLACE(nit, ' ', ''), '-', '') LIKE ?", ["%{$cleanSearchValue}%"]);
+        });
+    }
 }
