@@ -81,6 +81,7 @@ class SSOController extends Controller
                 'email'            => $userData['email'],
                 'telefono'         => $userData['telefono'] ?? null,
                 'id_agencia'       => $userData['idagencia'] ?? null,
+                'puesto'           => $userData['puesto']['nombre'] ?? null,
                 'avatar'           => $userData['avatar'] ?? null,
                 'roles_list'       => $userData['roles'],
                 'permissions_list' => $userData['permisos'],

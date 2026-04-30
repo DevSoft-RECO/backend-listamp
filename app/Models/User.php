@@ -24,6 +24,7 @@ class User extends Authenticatable
         'email',
         'telefono',
         'id_agencia',
+        'puesto',
         'avatar',
         'roles_list',
         'permissions_list',

@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('email')->nullable();
             $table->string('telefono')->nullable();
             $table->unsignedBigInteger('id_agencia')->nullable();
+            $table->string('puesto')->nullable();
             $table->string('avatar')->nullable();
             $table->json('roles_list')->nullable(); // Guardado JIT
             $table->json('permissions_list')->nullable(); // Guardado JIT
