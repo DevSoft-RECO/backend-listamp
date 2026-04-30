@@ -148,6 +148,7 @@ class ReporteListaMPController extends Controller
                 'nombre_consultado' => $request->nombre_buscado,
                 'documento' => $request->documento,
                 'tipo_identificacion' => $tipo_identificacion,
+                'coincidencias' => $coincidencias,
             ]);
         } else {
             // Descarga Directa y Registro de Búsqueda sin Resultados
