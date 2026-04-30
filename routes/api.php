@@ -13,6 +13,7 @@ Route::middleware('sso')->group(function () {
 
     // 📋 Listas MP
     Route::apiResource('listas-mp', \App\Http\Controllers\ListaMpController::class);
+    Route::apiResource('fiscalias', \App\Http\Controllers\FiscaliaController::class);
 
 });
 
