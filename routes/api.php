@@ -11,6 +11,9 @@ Route::middleware('sso')->group(function () {
     // 🧠 Sincronización JIT (Ecosistema Madre)
     Route::get('/me', [SSOController::class, 'me']);
 
+    // 📋 Listas MP
+    Route::apiResource('listas-mp', \App\Http\Controllers\ListaMpController::class);
+
 });
 
 
