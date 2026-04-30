@@ -115,7 +115,7 @@ class ReporteListaMPController extends Controller
             'pasaporte_consultado' => $pasaporte_consultado,
             'nit_consultado' => $nit_consultado,
             'nombre_usuario' => $usuario->name ?? 'N/A',
-            'tipo_usuario' => $usuario->roles_list[0] ?? 'N/A',
+            'tipo_usuario' => $usuario->puesto ?? 'N/A',
             'agencia_usuario' => $usuario->agencia->nombre ?? 'N/A',
             'fecha_consulta' => now()->format('d/m/Y'),
             'hora_consulta' => now()->format('H:i:s'),
