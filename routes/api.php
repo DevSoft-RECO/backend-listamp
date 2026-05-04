@@ -23,6 +23,13 @@ Route::middleware('sso')->group(function () {
         Route::post('/registrar-solicitud', [\App\Http\Controllers\Reportes\ReporteListaMPController::class, 'registrarSolicitud']);
     });
 
+    // 📄 Reportes Consolidado (MP + Créditos)
+    Route::prefix('reportes/lista-consolidada')->group(function () {
+        Route::get('/data-filtrada', [\App\Http\Controllers\Reportes\ReporteConsolidadoController::class, 'buscarDataFiltrada']);
+        Route::post('/generar-pdf', [\App\Http\Controllers\Reportes\ReporteConsolidadoController::class, 'generarPdf']);
+        Route::post('/registrar-solicitud', [\App\Http\Controllers\Reportes\ReporteConsolidadoController::class, 'registrarSolicitud']);
+    });
+
 });
 
 
