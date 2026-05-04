@@ -27,17 +27,30 @@ class BandejaSolicitudesController extends Controller
         // 1. Filtrar por tipo (estado)
         if ($tipo === 'pendientes') {
             $query->where(function ($q) {
-                $q->whereNull('estado_cumplimiento')
-                  ->orWhere('estado_cumplimiento', 'pendiente')
-                  ->orWhereNull('estado_jefatura')
-                  ->orWhere('estado_jefatura', 'pendiente');
+                $q->where(function($sq) {
+                    $sq->whereNull('estado_cumplimiento')->orWhere('estado_cumplimiento', 'pendiente');
+                })
+                ->orWhere(function($sq) {
+                    $sq->whereNull('estado_jefatura')->orWhere('estado_jefatura', 'pendiente');
+                });
             });
         } elseif ($tipo === 'autorizadas') {
             $query->where('estado_cumplimiento', 'autorizado')
                   ->where('estado_jefatura', 'autorizado');
         } elseif ($tipo === 'rechazadas') {
-            $query->where('estado_cumplimiento', 'rechazado')
-                  ->where('estado_jefatura', 'rechazado');
+            $query->where(function ($q) {
+                // Aparece aquí si ambos ya decidieron Y al menos uno rechazó
+                $q->where(function($sq) {
+                    $sq->whereNotNull('estado_cumplimiento')->where('estado_cumplimiento', '!=', 'pendiente');
+                })
+                ->where(function($sq) {
+                    $sq->whereNotNull('estado_jefatura')->where('estado_jefatura', '!=', 'pendiente');
+                })
+                ->where(function ($sq) {
+                    $sq->where('estado_cumplimiento', 'rechazado')
+                      ->orWhere('estado_jefatura', 'rechazado');
+                });
+            });
         }
 
         // 2. Filtros opcionales
@@ -112,23 +125,31 @@ class BandejaSolicitudesController extends Controller
         }
 
         if ($perfil === 'cumplimiento') {
-            $solicitud->estado_cumplimiento = $request->estado;
             if ($request->estado === 'autorizado') {
+                // REGLA: Si el otro ya rechazó en AMBOS, no se puede autorizar
+                if ($solicitud->destinatario === 'ambos' && $solicitud->estado_jefatura === 'rechazado') {
+                    return response()->json(['message' => 'No se puede autorizar. El Jefe de Agencia ya rechazó esta solicitud; usted también debe rechazar para cerrar el flujo.'], 422);
+                }
                 $solicitud->mensaje_autorizacionC = $request->comentario;
             } else {
                 $solicitud->mensaje_rechazadoC = $request->comentario;
             }
+            $solicitud->estado_cumplimiento = $request->estado;
             
             if ($solicitud->destinatario === 'cumplimiento') {
                 $solicitud->estado_jefatura = $request->estado;
             }
         } else {
-            $solicitud->estado_jefatura = $request->estado;
             if ($request->estado === 'autorizado') {
+                // REGLA: Si el otro ya rechazó en AMBOS, no se puede autorizar
+                if ($solicitud->destinatario === 'ambos' && $solicitud->estado_cumplimiento === 'rechazado') {
+                    return response()->json(['message' => 'No se puede autorizar. Cumplimiento ya rechazó esta solicitud; usted también debe rechazar para cerrar el flujo.'], 422);
+                }
                 $solicitud->mensaje_autorizacionJ = $request->comentario;
             } else {
                 $solicitud->mensaje_rechazadoJ = $request->comentario;
             }
+            $solicitud->estado_jefatura = $request->estado;
 
             if ($solicitud->destinatario === 'jefatura') {
                 $solicitud->estado_cumplimiento = $request->estado;
