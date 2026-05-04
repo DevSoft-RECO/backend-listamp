@@ -64,4 +64,26 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Agencia::class, 'id_agencia');
     }
+
+    /**
+     * Verifica si el usuario tiene un rol específico.
+     */
+    public function hasRole($role)
+    {
+        if (is_array($role)) {
+            return count(array_intersect($role, $this->roles_list ?? [])) > 0;
+        }
+        return in_array($role, $this->roles_list ?? []);
+    }
+
+    /**
+     * Verifica si el usuario tiene un permiso específico.
+     */
+    public function hasPermission($permission)
+    {
+        if (is_array($permission)) {
+            return count(array_intersect($permission, $this->permissions_list ?? [])) > 0;
+        }
+        return in_array($permission, $this->permissions_list ?? []);
+    }
 }
