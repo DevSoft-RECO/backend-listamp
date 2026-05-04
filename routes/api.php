@@ -38,6 +38,14 @@ Route::middleware('sso')->group(function () {
         Route::get('/{id}/descargar-pdf', [\App\Http\Controllers\Solicitudes\BandejaSolicitudesController::class, 'descargarPDF']);
     });
 
+    // 🔍 Consultas Sin Coincidencias
+    Route::prefix('consultas-sin-resultado')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Solicitudes\ConsultaSinResultadoController::class, 'index']);
+        Route::post('/{id}/verificar', [\App\Http\Controllers\Solicitudes\ConsultaSinResultadoController::class, 'verificar']);
+        Route::get('/{id}/regenerar-pdf', [\App\Http\Controllers\Solicitudes\ConsultaSinResultadoController::class, 'regenerarPdf']);
+        Route::delete('/{id}', [\App\Http\Controllers\Solicitudes\ConsultaSinResultadoController::class, 'destroy']);
+    });
+
 });
 
 
