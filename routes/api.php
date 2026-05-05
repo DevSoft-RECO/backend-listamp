@@ -8,6 +8,9 @@ use App\Http\Controllers\Auth\SSOController;
 // Asegúrate de que el middleware 'sso' esté registrado en bootstrap/app.php
 Route::middleware('sso')->group(function () {
     
+    // 📊 Dashboard Stats
+    Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class, 'getStats']);
+
     // 🧠 Sincronización JIT (Ecosistema Madre)
     Route::get('/me', [SSOController::class, 'me']);
 
