@@ -80,6 +80,7 @@ class SSOController extends Controller
             $user = User::whereRaw('LOWER(username) = ?', [strtolower($username)])->first();
 
             $updateData = [
+                'sso_id'           => $userData['id'],
                 'name'             => $userData['name'],
                 'email'            => $userData['email'],
                 'telefono'         => $userData['telefono'] ?? null,
