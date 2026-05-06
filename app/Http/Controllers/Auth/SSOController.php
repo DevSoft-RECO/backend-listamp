@@ -43,9 +43,14 @@ class SSOController extends Controller
                 $userData = $userData['data'];
             }
 
+            $username = $userData['username'] ?? 'unknown';
+
             // 2. APLANAMIENTO CRÍTICO (Spatie Objects -> Simple Strings)
-            $userData['roles'] = $this->flatten($userData['roles'] ?? []);
-            $userData['permisos'] = $this->flatten($userData['permisos'] ?? []);
+            // Extraer roles y permisos buscando en llaves comunes (permisos/permissions)
+            $userData['roles'] = $this->flatten($userData['roles'] ?? $userData['roles_list'] ?? []);
+            
+            $rawPermisos = $userData['permisos'] ?? $userData['permissions'] ?? $userData['permissions_list'] ?? [];
+            $userData['permisos'] = $this->flatten($rawPermisos);
 
             // 3. Extracción de JTI del Token (para mirroring con Go)
             $jti = null;
@@ -72,8 +77,6 @@ class SSOController extends Controller
             }
 
             // Upsert User (Link via Username, Case-Insensitive)
-            $username = $userData['username'] ?? '';
-
             $user = User::whereRaw('LOWER(username) = ?', [strtolower($username)])->first();
 
             $updateData = [
