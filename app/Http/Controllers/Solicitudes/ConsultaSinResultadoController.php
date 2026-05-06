@@ -20,6 +20,7 @@ class ConsultaSinResultadoController extends Controller
         $tipoReporte = $request->input('tipo_reporte', 'todas');
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
+        $search = $request->input('search');
 
         $query = ConsultaSinResultado::with(['usuario', 'agencia']);
 
@@ -33,6 +34,17 @@ class ConsultaSinResultadoController extends Controller
                 Carbon::parse($fechaInicio)->startOfDay(),
                 Carbon::parse($fechaFin)->endOfDay()
             ]);
+        }
+
+        if ($request->filled('search_value')) {
+            $type = $request->input('search_type', 'documento');
+            $value = $request->input('search_value');
+
+            if ($type === 'id') {
+                $query->where('id', $value);
+            } else {
+                $query->where('numero_documento', 'like', "%{$value}%");
+            }
         }
 
         // 2. Seguridad y Roles (Híbrido: Super Admin o Permiso de Auditoría)
@@ -147,6 +159,7 @@ class ConsultaSinResultadoController extends Controller
         $tipoReporte = $request->input('tipo_reporte', 'todas');
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
+        $search = $request->input('search');
 
         $query = ConsultaSinResultado::with(['usuario', 'agencia']);
 
@@ -160,6 +173,17 @@ class ConsultaSinResultadoController extends Controller
                 Carbon::parse($fechaInicio)->startOfDay(),
                 Carbon::parse($fechaFin)->endOfDay()
             ]);
+        }
+
+        if ($request->filled('search_value')) {
+            $type = $request->input('search_type', 'documento');
+            $value = $request->input('search_value');
+
+            if ($type === 'id') {
+                $query->where('id', $value);
+            } else {
+                $query->where('numero_documento', 'like', "%{$value}%");
+            }
         }
 
         // Seguridad
