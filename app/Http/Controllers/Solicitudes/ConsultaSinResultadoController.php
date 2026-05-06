@@ -35,11 +35,14 @@ class ConsultaSinResultadoController extends Controller
             ]);
         }
 
-        // 2. Seguridad y Roles
-        if (!$user->hasRole('Super Admin')) {
-            if ($user->hasRole('Jefe de Agencia')) {
+        // 2. Seguridad y Roles (Híbrido: Super Admin o Permiso de Auditoría)
+        if (!$user->hasRole('Super Admin') && !$user->hasPermission('consultas_ver_todo')) {
+            if ($user->hasPermission('consultas_ver_agencia')) {
                 $query->where('agencia_id', $user->id_agencia);
-            } elseif ($user->hasRole(['Secretarias', 'Asesores de Credito'])) {
+            } elseif ($user->hasPermission('consultas_ver_propias')) {
+                $query->where('user_id', $user->id);
+            } else {
+                // Por defecto solo ve lo suyo
                 $query->where('user_id', $user->id);
             }
         }
@@ -140,9 +143,10 @@ class ConsultaSinResultadoController extends Controller
      */
     public function destroy($id)
     {
+        $user = Auth::user();
         $registro = ConsultaSinResultado::findOrFail($id);
         
-        if (!Auth::user()->hasRole('Super Admin')) {
+        if (!$user->hasRole('Super Admin') && !$user->hasPermission('consultas_eliminar')) {
             return response()->json(['message' => 'No tiene permisos para eliminar registros.'], 403);
         }
 
