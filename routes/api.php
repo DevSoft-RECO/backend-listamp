@@ -44,6 +44,7 @@ Route::middleware('sso')->group(function () {
     // 🔍 Consultas Sin Coincidencias
     Route::prefix('consultas-sin-resultado')->group(function () {
         Route::get('/', [\App\Http\Controllers\Solicitudes\ConsultaSinResultadoController::class, 'index']);
+        Route::get('/export-csv', [\App\Http\Controllers\Solicitudes\ConsultaSinResultadoController::class, 'exportCSV']);
         Route::post('/{id}/verificar', [\App\Http\Controllers\Solicitudes\ConsultaSinResultadoController::class, 'verificar']);
         Route::get('/{id}/regenerar-pdf', [\App\Http\Controllers\Solicitudes\ConsultaSinResultadoController::class, 'regenerarPdf']);
         Route::delete('/{id}', [\App\Http\Controllers\Solicitudes\ConsultaSinResultadoController::class, 'destroy']);

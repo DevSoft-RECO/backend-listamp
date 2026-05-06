@@ -139,6 +139,77 @@ class ConsultaSinResultadoController extends Controller
     }
 
     /**
+     * Exportar a CSV
+     */
+    public function exportCSV(Request $request)
+    {
+        $user = Auth::user();
+        $tipoReporte = $request->input('tipo_reporte', 'todas');
+        $fechaInicio = $request->input('fecha_inicio');
+        $fechaFin = $request->input('fecha_fin');
+
+        $query = ConsultaSinResultado::with(['usuario', 'agencia']);
+
+        // Mismos filtros que el index
+        if ($tipoReporte !== 'todas') {
+            $query->where('tipo_reporte', $tipoReporte);
+        }
+
+        if ($fechaInicio && $fechaFin) {
+            $query->whereBetween('created_at', [
+                Carbon::parse($fechaInicio)->startOfDay(),
+                Carbon::parse($fechaFin)->endOfDay()
+            ]);
+        }
+
+        // Seguridad
+        if (!$user->hasRole('Super Admin') && !$user->hasPermission('consultas_ver_todo')) {
+            if ($user->hasPermission('consultas_ver_agencia')) {
+                $query->where('agencia_id', $user->id_agencia);
+            } elseif ($user->hasPermission('consultas_ver_propias')) {
+                $query->where('user_id', $user->id);
+            } else {
+                $query->where('user_id', $user->id);
+            }
+        }
+
+        $registros = $query->latest()->get();
+
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=historial_consultas_limpias.csv",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $columns = ['ID', 'Nombre Consultado', 'Tipo Doc', 'Documento', 'Tipo Reporte', 'Fecha Consulta', 'Verificacion', 'Usuario (Username)', 'Agencia (ID)'];
+
+        $callback = function() use($registros, $columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+
+            foreach ($registros as $r) {
+                fputcsv($file, [
+                    $r->id,
+                    $r->nombre_buscado,
+                    $r->tipo_documento,
+                    $r->numero_documento,
+                    $r->tipo_reporte,
+                    $r->fecha_consulta,
+                    $r->verificacion,
+                    $r->usuario->username ?? 'N/A',
+                    $r->agencia_id
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
      * Eliminar registro
      */
     public function destroy($id)
