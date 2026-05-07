@@ -18,6 +18,9 @@ Route::middleware('sso')->group(function () {
     Route::get('listas-mp/export', [\App\Http\Controllers\ListaMpController::class, 'exportCSV']);
     Route::apiResource('listas-mp', \App\Http\Controllers\ListaMpController::class);
     Route::apiResource('fiscalias', \App\Http\Controllers\FiscaliaController::class);
+    
+    // 💳 Lista Crédito
+    Route::get('lista-credito/export', [\App\Http\Controllers\ListaCreditoController::class, 'exportCSV']);
     Route::apiResource('lista-credito', \App\Http\Controllers\ListaCreditoController::class);
 
     // 📄 Reportes Lista MP

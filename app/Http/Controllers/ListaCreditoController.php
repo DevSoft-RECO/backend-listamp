@@ -86,4 +86,54 @@ class ListaCreditoController extends Controller
             'message' => 'Registro eliminado correctamente'
         ]);
     }
+
+    /**
+     * Export the listing to CSV.
+     */
+    public function exportCSV(Request $request)
+    {
+        $query = ListaCredito::query();
+
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('nombre', 'LIKE', "%{$search}%")
+                  ->orWhere('dpi', 'LIKE', "%{$search}%")
+                  ->orWhere('motivo', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $data = $query->orderBy('created_at', 'desc')->get();
+
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=lista_negra_creditos.csv",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $columns = ['ID', 'Nombre', 'Identificación (DPI)', 'Código Usuario', 'Motivo', 'Descripción', 'Fecha Registro'];
+
+        $callback = function() use($data, $columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+
+            foreach ($data as $item) {
+                fputcsv($file, [
+                    $item->id,
+                    $item->nombre,
+                    $item->dpi,
+                    $item->id_usuario,
+                    $item->motivo,
+                    $item->descripcion,
+                    $item->created_at,
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
 }
