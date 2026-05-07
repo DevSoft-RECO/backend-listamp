@@ -9,6 +9,63 @@ use Illuminate\Support\Facades\Validator;
 class ListaMpController extends Controller
 {
     /**
+     * Export all records to CSV.
+     */
+    public function exportCSV()
+    {
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="reporte_lista_mp_' . date('Y-m-d_His') . '.csv"',
+        ];
+
+        $callback = function() {
+            $file = fopen('php://output', 'w');
+            
+            // UTF-8 BOM for Excel
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            // Headers
+            fputcsv($file, [
+                'ID', 'Nombre', 'Tipo Identificación', 'Registro', 'CUI', 'Pasaporte', 
+                'Lugar Origen', 'Fecha Respuesta', 'NIT', 'Fecha Oficio', 'Oficio', 
+                'Tipo P', 'Fiscalía', 'Fecha Cooperativa', 'Fecha Cumplimiento', 
+                'Estado', 'Motivo de Baja', 'Fecha Creación', 'Última Actualización'
+            ], ';');
+
+            // Data
+            ListaMp::chunk(200, function($records) use ($file) {
+                foreach ($records as $record) {
+                    fputcsv($file, [
+                        $record->iddatos,
+                        $record->nombre,
+                        $record->tipo_identificacion,
+                        $record->registro,
+                        $record->cui,
+                        $record->pasaporte,
+                        $record->lugar_origen,
+                        $record->fecha_respuesta,
+                        $record->nit,
+                        $record->fecha_of,
+                        $record->oficio,
+                        $record->tipo_p,
+                        $record->fiscalia,
+                        $record->fecha_cooperativa,
+                        $record->fecha_cumplimiento,
+                        $record->estado == '1' ? 'Activo' : 'Inactivo',
+                        $record->observacion_baja,
+                        $record->created_at,
+                        $record->updated_at
+                    ], ';');
+                }
+            });
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index(Request $request)

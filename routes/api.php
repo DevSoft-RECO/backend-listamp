@@ -15,6 +15,7 @@ Route::middleware('sso')->group(function () {
     Route::get('/me', [SSOController::class, 'me']);
 
     // 📋 Listas MP
+    Route::get('listas-mp/export', [\App\Http\Controllers\ListaMpController::class, 'exportCSV']);
     Route::apiResource('listas-mp', \App\Http\Controllers\ListaMpController::class);
     Route::apiResource('fiscalias', \App\Http\Controllers\FiscaliaController::class);
     Route::apiResource('lista-credito', \App\Http\Controllers\ListaCreditoController::class);
