@@ -26,14 +26,46 @@ class BandejaSolicitudesController extends Controller
 
         // 1. Filtrar por tipo (estado)
         if ($tipo === 'pendientes') {
-            $query->where(function ($q) {
-                $q->where(function($sq) {
-                    $sq->whereNull('estado_cumplimiento')->orWhere('estado_cumplimiento', 'pendiente');
-                })
-                ->orWhere(function($sq) {
-                    $sq->whereNull('estado_jefatura')->orWhere('estado_jefatura', 'pendiente');
-                });
+            $query->where(function ($q) use ($user) {
+                // Tareas de Cumplimiento: si tiene el permiso y el destinatario incluye cumplimiento
+                if ($user->hasPermission('solicitudes_autorizar_cumplimiento') || $user->hasRole('Super Admin')) {
+                    $q->orWhere(function($sq) {
+                        $sq->whereIn('destinatario', ['cumplimiento', 'ambos'])
+                           ->where(function($ssq) {
+                               $ssq->whereNull('estado_cumplimiento')->orWhere('estado_cumplimiento', 'pendiente');
+                           });
+                    });
+                }
+
+                // Tareas de Jefatura: si tiene el permiso, es de su agencia y el destinatario incluye jefatura
+                if ($user->hasPermission('solicitudes_autorizar_jefatura') || $user->hasRole('Super Admin')) {
+                    $q->orWhere(function($sq) use ($user) {
+                        $sq->where('agencia_id', $user->id_agencia)
+                           ->whereIn('destinatario', ['jefatura', 'ambos'])
+                           ->where(function($ssq) {
+                               $ssq->whereNull('estado_jefatura')->orWhere('estado_jefatura', 'pendiente');
+                           });
+                    });
+                }
+
+                // Auditores: ven todo lo que esté pendiente de cualquier lado
+                if ($user->hasPermission('solicitudes_ver_todo')) {
+                    $q->orWhere(function($sq) {
+                        $sq->where(function($sq1) {
+                            $sq1->whereNull('estado_cumplimiento')->orWhere('estado_cumplimiento', 'pendiente');
+                        })
+                        ->orWhere(function($sq1) {
+                            $sq1->whereNull('estado_jefatura')->orWhere('estado_jefatura', 'pendiente');
+                        });
+                    });
+                }
             });
+        } elseif ($tipo === 'agencia') {
+            // Vista de Monitoreo: Solo para quienes tienen permiso de ver agencia
+            if (!$user->hasRole('Super Admin') && !$user->hasPermission('solicitudes_ver_agencia')) {
+                return response()->json(['message' => 'No tiene permiso para ver el monitoreo de agencia.'], 403);
+            }
+            $query->where('agencia_id', $user->id_agencia);
         } elseif ($tipo === 'autorizadas') {
             $query->where('estado_cumplimiento', 'autorizado')
                   ->where('estado_jefatura', 'autorizado');
@@ -65,17 +97,28 @@ class BandejaSolicitudesController extends Controller
             ]);
         }
 
-        // 3. Permisos y Roles (Seguridad - Usando helpers personalizados en modelo User)
-        if (!$user->hasRole('Super Admin')) {
-            // Si es Jefe de Agencia, solo ve las de su propia agencia
-            if ($user->hasRole('Jefe de Agencia')) {
-                $query->where('agencia_id', $user->id_agencia);
-                $query->whereIn('destinatario', ['jefatura', 'ambos']);
-            } 
-            // Si es Cumplimiento
-            elseif ($user->hasRole('Cumplimiento')) {
-                $query->whereIn('destinatario', ['cumplimiento', 'ambos']);
-            }
+        // 3. Permisos y Roles (Híbrido: Super Admin o Ver Todo tienen acceso total)
+        if (!$user->hasRole('Super Admin') && !$user->hasPermission('solicitudes_ver_todo')) {
+            $query->where(function($q) use ($user) {
+                $hasVisibility = false;
+
+                // Opción A: Ver su agencia (Jefaturas)
+                if ($user->hasPermission('solicitudes_ver_agencia')) {
+                    $q->orWhere('agencia_id', $user->id_agencia);
+                    $hasVisibility = true;
+                }
+                
+                // Opción B: Ver cumplimiento
+                if ($user->hasPermission('solicitudes_ver_cumplimiento')) {
+                    $q->orWhereIn('destinatario', ['cumplimiento', 'ambos']);
+                    $hasVisibility = true;
+                }
+                
+                // Si no tiene ningún permiso de visualización, forzar resultado vacío
+                if (!$hasVisibility) {
+                    $q->whereRaw('1 = 0');
+                }
+            });
         }
 
         $solicitudes = $query->latest()->paginate($request->input('per_page', 15));
@@ -91,9 +134,15 @@ class BandejaSolicitudesController extends Controller
         $solicitud = SolicitudAutorizacion::with(['usuario', 'agencia'])->findOrFail($id);
         $user = Auth::user();
 
-        // Validación de seguridad básica
-        if (!$user->hasRole('Super Admin')) {
-            if ($user->hasRole('Jefe de Agencia') && $solicitud->agencia_id != $user->id_agencia) {
+        // Validación de seguridad de acceso al detalle
+        if (!$user->hasRole('Super Admin') && !$user->hasPermission('solicitudes_ver_todo')) {
+            $canSeeAgencia = $user->hasPermission('solicitudes_ver_agencia') && 
+                            $solicitud->agencia_id == $user->id_agencia;
+                            
+            $canSeeCumplimiento = $user->hasPermission('solicitudes_ver_cumplimiento') && 
+                                 in_array($solicitud->destinatario, ['cumplimiento', 'ambos']);
+                                 
+            if (!$canSeeAgencia && !$canSeeCumplimiento) {
                 return response()->json(['message' => 'No tiene permiso para ver esta solicitud.'], 403);
             }
         }
@@ -116,12 +165,12 @@ class BandejaSolicitudesController extends Controller
         $user = Auth::user();
         $perfil = $request->perfil;
 
-        // Validar que el usuario tenga el rol/permiso adecuado
-        if ($perfil === 'cumplimiento' && !$user->hasRole(['Super Admin', 'Cumplimiento'])) {
-            return response()->json(['message' => 'No tiene permisos de Cumplimiento.'], 403);
+        // Validar que el usuario tenga el permiso granular adecuado (Bypass para Super Admin)
+        if ($perfil === 'cumplimiento' && !$user->hasRole('Super Admin') && !$user->hasPermission('solicitudes_autorizar_cumplimiento')) {
+            return response()->json(['message' => 'No tiene permisos para autorizar como Cumplimiento.'], 403);
         }
-        if ($perfil === 'jefatura' && !$user->hasRole(['Super Admin', 'Jefe de Agencia'])) {
-            return response()->json(['message' => 'No tiene permisos de Jefe de Agencia.'], 403);
+        if ($perfil === 'jefatura' && !$user->hasRole('Super Admin') && !$user->hasPermission('solicitudes_autorizar_jefatura')) {
+            return response()->json(['message' => 'No tiene permisos para autorizar como Jefe de Agencia.'], 403);
         }
 
         if ($perfil === 'cumplimiento') {
@@ -175,7 +224,21 @@ class BandejaSolicitudesController extends Controller
      */
     public function descargarPDF($id)
     {
+        $user = Auth::user();
         $solicitud = SolicitudAutorizacion::findOrFail($id);
+
+        // Permitir si es Super Admin, tiene permiso de descarga O tiene permiso de ver la solicitud
+        $hasDownloadPerm = $user->hasPermission('solicitudes_descargar_pdf');
+        $canSeeTodo = $user->hasPermission('solicitudes_ver_todo');
+        $canSeeAgencia = $user->hasPermission('solicitudes_ver_agencia') && 
+                         $solicitud->agencia_id == $user->id_agencia;
+        $canSeeCumplimiento = $user->hasPermission('solicitudes_ver_cumplimiento') && 
+                              in_array($solicitud->destinatario, ['cumplimiento', 'ambos']);
+
+        if (!$user->hasRole('Super Admin') && !$hasDownloadPerm && !$canSeeTodo && !$canSeeAgencia && !$canSeeCumplimiento) {
+            return response()->json(['message' => 'No tiene permisos para acceder a este documento.'], 403);
+        }
+
         $rutaCompleta = public_path($solicitud->pdf_path);
 
         if (!File::exists($rutaCompleta)) {
