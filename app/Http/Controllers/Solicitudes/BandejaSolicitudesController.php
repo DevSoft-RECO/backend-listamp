@@ -26,38 +26,31 @@ class BandejaSolicitudesController extends Controller
 
         // 1. Filtrar por tipo (estado)
         if ($tipo === 'pendientes') {
+            // Regla de Oro: En pendientes SOLO debe haber cosas que NO estén terminadas (al menos uno en pendiente)
+            $query->where(function ($q) {
+                $q->where(function($sq) {
+                    $sq->whereNull('estado_cumplimiento')->orWhere('estado_cumplimiento', 'pendiente');
+                })
+                ->orWhere(function($sq) {
+                    $sq->whereNull('estado_jefatura')->orWhere('estado_jefatura', 'pendiente');
+                });
+            });
+
+            // Ahora aplicamos quién puede ver qué de esos pendientes
             $query->where(function ($q) use ($user) {
-                // Tareas de Cumplimiento: si tiene el permiso y el destinatario incluye cumplimiento
+                // Tareas de Cumplimiento
                 if ($user->hasPermission('solicitudes_autorizar_cumplimiento') || $user->hasRole('Super Admin')) {
-                    $q->orWhere(function($sq) {
-                        $sq->whereIn('destinatario', ['cumplimiento', 'ambos'])
-                           ->where(function($ssq) {
-                               $ssq->whereNull('estado_cumplimiento')->orWhere('estado_cumplimiento', 'pendiente');
-                           });
-                    });
+                    $q->orWhereIn('destinatario', ['cumplimiento', 'ambos']);
                 }
 
-                // Tareas de Jefatura: si tiene el permiso, es de su agencia y el destinatario incluye jefatura
-                if ($user->hasPermission('solicitudes_autorizar_jefatura') || $user->hasRole('Super Admin')) {
-                    $q->orWhere(function($sq) use ($user) {
-                        $sq->where('agencia_id', $user->id_agencia)
-                           ->whereIn('destinatario', ['jefatura', 'ambos'])
-                           ->where(function($ssq) {
-                               $ssq->whereNull('estado_jefatura')->orWhere('estado_jefatura', 'pendiente');
-                           });
-                    });
+                // Tareas de Jefatura / Monitoreo Agencia
+                if ($user->hasPermission('solicitudes_autorizar_jefatura') || $user->hasPermission('solicitudes_ver_agencia') || $user->hasRole('Super Admin')) {
+                    $q->orWhere('agencia_id', $user->id_agencia);
                 }
 
-                // Auditores: ven todo lo que esté pendiente de cualquier lado
+                // Auditores Globales
                 if ($user->hasPermission('solicitudes_ver_todo')) {
-                    $q->orWhere(function($sq) {
-                        $sq->where(function($sq1) {
-                            $sq1->whereNull('estado_cumplimiento')->orWhere('estado_cumplimiento', 'pendiente');
-                        })
-                        ->orWhere(function($sq1) {
-                            $sq1->whereNull('estado_jefatura')->orWhere('estado_jefatura', 'pendiente');
-                        });
-                    });
+                    $q->orWhereRaw('1 = 1');
                 }
             });
         } elseif ($tipo === 'agencia') {
