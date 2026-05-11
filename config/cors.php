@@ -30,7 +30,7 @@ return [
         // ---------------------------------------------------------
         // 2. ENTORNO PRODUCCIÓN (Google Cloud)
         // ---------------------------------------------------------
-        'https://inventarioit.yamankutx.com.gt',       // Tu App Madre Real
+        'https://burointerno.yamankutx.com.gt',
     ],
 
     'allowed_origins_patterns' => [],
