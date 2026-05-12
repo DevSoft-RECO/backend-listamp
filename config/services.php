@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'mother_app' => [
+        'url' => env('APP_MADRE_URL', 'http://localhost:8000'),
+    ],
+
 ];
