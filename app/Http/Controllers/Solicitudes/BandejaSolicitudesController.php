@@ -48,8 +48,8 @@ class BandejaSolicitudesController extends Controller
                     $q->orWhere('agencia_id', $user->id_agencia);
                 }
 
-                // Auditores Globales
-                if ($user->hasPermission('solicitudes_ver_todo')) {
+                // Auditores Globales o Super Admin (Ven todo lo pendiente)
+                if ($user->hasPermission('solicitudes_ver_todo') || $user->hasRole('Super Admin')) {
                     $q->orWhereRaw('1 = 1');
                 }
             });
@@ -58,7 +58,9 @@ class BandejaSolicitudesController extends Controller
             if (!$user->hasRole('Super Admin') && !$user->hasPermission('solicitudes_ver_agencia')) {
                 return response()->json(['message' => 'No tiene permiso para ver el monitoreo de agencia.'], 403);
             }
-            $query->where('agencia_id', $user->id_agencia);
+            if (!$user->hasRole('Super Admin')) {
+                $query->where('agencia_id', $user->id_agencia);
+            }
         } elseif ($tipo === 'autorizadas') {
             $query->where('estado_cumplimiento', 'autorizado')
                   ->where('estado_jefatura', 'autorizado');
