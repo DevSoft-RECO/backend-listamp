@@ -21,7 +21,8 @@ class SSOController extends Controller
     public function me(Request $request): JsonResponse
     {
         $token = $request->bearerToken();
-        $motherUrl = env('APP_MADRE_URL', 'http://localhost:8000');
+        // CAMBIO: Ahora usamos config() en lugar de env()
+        $motherUrl = config('services.mother_app.url');
 
         try {
             // 1. Consultar a la Madre usando el mismo Bearer Token
@@ -48,7 +49,7 @@ class SSOController extends Controller
             // 2. APLANAMIENTO CRÍTICO (Spatie Objects -> Simple Strings)
             // Extraer roles y permisos buscando en llaves comunes (permisos/permissions)
             $userData['roles'] = $this->flatten($userData['roles'] ?? $userData['roles_list'] ?? []);
-            
+
             $rawPermisos = $userData['permisos'] ?? $userData['permissions'] ?? $userData['permissions_list'] ?? [];
             $userData['permisos'] = $this->flatten($rawPermisos);
 
