@@ -233,7 +233,7 @@
             <h1>COOPERATIVA YAMAN KUTX R.L.</h1>
         </div>
         <div class="textlogo">
-            <h1>VALIDACIÓN DE LISTA NEGRA</h1>
+            <h1>COMPROBANTE DE VALIDACIÓN</h1>
         </div>
 
         <div class="header-main-info">
