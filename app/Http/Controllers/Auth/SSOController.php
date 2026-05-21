@@ -50,8 +50,18 @@ class SSOController extends Controller
             // Extraer roles y permisos buscando en llaves comunes (permisos/permissions)
             $userData['roles'] = $this->flatten($userData['roles'] ?? $userData['roles_list'] ?? []);
 
-            $rawPermisos = $userData['permisos'] ?? $userData['permissions'] ?? $userData['permissions_list'] ?? [];
-            $userData['permisos'] = $this->flatten($rawPermisos);
+            // Filtrar permisos por la categoría asignada "Lista MP" para no almacenar permisos de otras apps
+            if (isset($userData['permissions_detailed']) && is_array($userData['permissions_detailed'])) {
+                $filteredPermissions = array_filter($userData['permissions_detailed'], function ($perm) {
+                    return isset($perm['category']) && $perm['category'] === 'Lista MP';
+                });
+                $userData['permisos'] = array_map(function ($perm) {
+                    return $perm['name'] ?? '';
+                }, $filteredPermissions);
+            } else {
+                $rawPermisos = $userData['permisos'] ?? $userData['permissions'] ?? $userData['permissions_list'] ?? [];
+                $userData['permisos'] = $this->flatten($rawPermisos);
+            }
 
             // 3. Extracción de JTI del Token (para mirroring con Go)
             $jti = null;
