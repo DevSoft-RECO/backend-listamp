@@ -55,9 +55,11 @@ class SSOController extends Controller
                 $filteredPermissions = array_filter($userData['permissions_detailed'], function ($perm) {
                     return isset($perm['category']) && $perm['category'] === 'Lista MP';
                 });
-                $userData['permisos'] = array_map(function ($perm) {
+                // array_values() es indispensable aquí para resetear los índices del array filtrado
+                // y evitar que json_encode lo serialice como objeto asociativo {"5": "permiso"}
+                $userData['permisos'] = array_values(array_map(function ($perm) {
                     return $perm['name'] ?? '';
-                }, $filteredPermissions);
+                }, $filteredPermissions));
             } else {
                 $rawPermisos = $userData['permisos'] ?? $userData['permissions'] ?? $userData['permissions_list'] ?? [];
                 $userData['permisos'] = $this->flatten($rawPermisos);
