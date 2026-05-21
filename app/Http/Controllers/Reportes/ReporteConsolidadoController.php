@@ -311,7 +311,7 @@ class ReporteConsolidadoController extends Controller
             'usuario' => [
                 'name' => $usuario->name ?? 'N/A',
                 'role' => $usuario->puesto ?? 'N/A', // Usamos puesto
-                'agency' => 'Agencia Central' // Placeholder o sacar del modelo
+                'agency' => $usuario->agencia->nombre ?? 'N/A' // Obtener la agencia del usuario actual
             ],
             'fecha_consulta' => now()->format('d/m/Y H:i:s'),
             'estado_final' => $estadoFinal,
