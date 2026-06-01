@@ -91,7 +91,7 @@ class ConsultaSinResultado extends Model
                     'type' => 'direct', // Notificación directa/personal
                     'title' => $titulo,
                     'message' => $mensaje,
-                    'app' => 'Migración MP'
+                    'app' => 'Buró Interno'
                 ]);
             } catch (\Exception $e) {
                 \Log::error("Error al enviar notificación de consultas pendientes al Jefe ID {$jefe->id}: " . $e->getMessage());
