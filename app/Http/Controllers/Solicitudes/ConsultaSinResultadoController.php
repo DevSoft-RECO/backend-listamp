@@ -42,6 +42,8 @@ class ConsultaSinResultadoController extends Controller
 
             if ($type === 'id') {
                 $query->where('id', $value);
+            } elseif ($type === 'nombre') {
+                $query->where('nombre_buscado', 'like', "%{$value}%");
             } else {
                 $query->where('numero_documento', 'like', "%{$value}%");
             }
@@ -181,6 +183,8 @@ class ConsultaSinResultadoController extends Controller
 
             if ($type === 'id') {
                 $query->where('id', $value);
+            } elseif ($type === 'nombre') {
+                $query->where('nombre_buscado', 'like', "%{$value}%");
             } else {
                 $query->where('numero_documento', 'like', "%{$value}%");
             }
