@@ -29,7 +29,7 @@ class ListaMpController extends Controller
                 'ID', 'Nombre', 'Tipo Identificación', 'Registro', 'CUI', 'Pasaporte', 
                 'Lugar Origen', 'Fecha Respuesta', 'NIT', 'Fecha Oficio', 'Oficio', 
                 'Tipo P', 'Fiscalía', 'Fecha Cooperativa', 'Fecha Cumplimiento', 
-                'Estado', 'Motivo de Baja', 'Fecha Creación', 'Última Actualización'
+                'Estado', '¿Es Asociado?', 'Motivo de Baja', 'Fecha Creación', 'Última Actualización'
             ], ';');
 
             // Data
@@ -52,6 +52,7 @@ class ListaMpController extends Controller
                         $record->fecha_cooperativa,
                         $record->fecha_cumplimiento,
                         $record->estado == '1' ? 'Activo' : 'Inactivo',
+                        $record->es_asociado,
                         $record->observacion_baja,
                         $record->created_at,
                         $record->updated_at
@@ -106,7 +107,7 @@ class ListaMpController extends Controller
         $validator = Validator::make($request->all(), [
             'nombre' => 'required|string|max:255',
             'fecha_respuesta' => 'required|date',
-            // Add other validations as needed
+            'es_asociado' => 'nullable|in:SI,NO,Pendiente',
         ]);
 
         if ($validator->fails()) {
@@ -140,6 +141,7 @@ class ListaMpController extends Controller
         $validator = Validator::make($request->all(), [
             'nombre' => 'required|string|max:255',
             'fecha_respuesta' => 'required|date',
+            'es_asociado' => 'nullable|in:SI,NO,Pendiente',
         ]);
 
         if ($validator->fails()) {

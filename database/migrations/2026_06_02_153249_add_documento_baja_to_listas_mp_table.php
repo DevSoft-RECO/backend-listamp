@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::table('listas_mp', function (Blueprint $table) {
             $table->string('documento_baja')->nullable()->after('observacion_baja');
+            $table->enum('es_asociado', ['SI', 'NO', 'Pendiente'])->default('Pendiente')->after('estado');
         });
     }
 
@@ -22,7 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('listas_mp', function (Blueprint $table) {
-            $table->dropColumn('documento_baja');
+            $table->dropColumn(['documento_baja', 'es_asociado']);
         });
     }
 };

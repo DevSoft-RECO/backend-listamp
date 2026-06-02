@@ -29,7 +29,8 @@ class ListaMp extends Model
         'fecha_cumplimiento',
         'estado',
         'observacion_baja',
-        'documento_baja'
+        'documento_baja',
+        'es_asociado'
     ];
 
     protected $casts = [
