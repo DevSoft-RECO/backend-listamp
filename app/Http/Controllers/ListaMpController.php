@@ -179,4 +179,46 @@ class ListaMpController extends Controller
             'data' => $lista
         ]);
     }
+
+    /**
+     * Dar de baja (desactivar) con soporte para subir archivo PDF de respaldo.
+     */
+    public function darBaja(Request $request, $id)
+    {
+        $lista = ListaMp::findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'observacion_baja' => 'required|string|min:5',
+            'documento_baja' => 'nullable|file|mimes:pdf|max:10240', // Max 10MB PDF
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $data = [
+            'estado' => '0',
+            'observacion_baja' => $request->observacion_baja
+        ];
+
+        if ($request->hasFile('documento_baja')) {
+            $file = $request->file('documento_baja');
+            $filename = 'baja_' . $id . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $directorio = 'uploads/documentos_baja';
+
+            if (!\Illuminate\Support\Facades\File::exists(public_path($directorio))) {
+                \Illuminate\Support\Facades\File::makeDirectory(public_path($directorio), 0755, true);
+            }
+
+            $file->move(public_path($directorio), $filename);
+            $data['documento_baja'] = $directorio . '/' . $filename;
+        }
+
+        $lista->update($data);
+
+        return response()->json([
+            'message' => 'Registro desactivado (Baja) exitosamente',
+            'data' => $lista
+        ]);
+    }
 }
