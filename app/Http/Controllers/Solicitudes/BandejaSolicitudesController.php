@@ -242,4 +242,27 @@ class BandejaSolicitudesController extends Controller
 
         return response()->download($rutaCompleta);
     }
+
+    /**
+     * Eliminar solicitud y su archivo PDF adjunto
+     */
+    public function destroy($id)
+    {
+        $solicitud = SolicitudAutorizacion::findOrFail($id);
+
+        // Borrar el archivo si existe
+        if ($solicitud->pdf_path) {
+            $rutaArchivo = public_path($solicitud->pdf_path);
+            if (File::exists($rutaArchivo)) {
+                File::delete($rutaArchivo);
+            }
+        }
+
+        $solicitud->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Solicitud eliminada y archivo borrado correctamente.'
+        ]);
+    }
 }

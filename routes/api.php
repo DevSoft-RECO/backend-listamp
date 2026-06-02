@@ -44,6 +44,7 @@ Route::middleware('sso')->group(function () {
         Route::get('/{id}', [\App\Http\Controllers\Solicitudes\BandejaSolicitudesController::class, 'show']);
         Route::post('/{id}/actualizar-estado', [\App\Http\Controllers\Solicitudes\BandejaSolicitudesController::class, 'actualizarEstado']);
         Route::get('/{id}/descargar-pdf', [\App\Http\Controllers\Solicitudes\BandejaSolicitudesController::class, 'descargarPDF']);
+        Route::delete('/{id}', [\App\Http\Controllers\Solicitudes\BandejaSolicitudesController::class, 'destroy']);
     });
 
     // 🔍 Consultas Sin Coincidencias
