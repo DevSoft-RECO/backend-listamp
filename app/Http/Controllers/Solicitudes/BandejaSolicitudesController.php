@@ -102,13 +102,13 @@ class BandejaSolicitudesController extends Controller
                     $q->orWhere('agencia_id', $user->id_agencia);
                     $hasVisibility = true;
                 }
-                
+
                 // Opción B: Ver cumplimiento
                 if ($user->hasPermission('solicitudes_ver_cumplimiento')) {
                     $q->orWhereIn('destinatario', ['cumplimiento', 'ambos']);
                     $hasVisibility = true;
                 }
-                
+
                 // Si no tiene ningún permiso de visualización, forzar resultado vacío
                 if (!$hasVisibility) {
                     $q->whereRaw('1 = 0');
@@ -131,12 +131,12 @@ class BandejaSolicitudesController extends Controller
 
         // Validación de seguridad de acceso al detalle
         if (!$user->hasRole('Super Admin') && !$user->hasPermission('solicitudes_ver_todo')) {
-            $canSeeAgencia = $user->hasPermission('solicitudes_ver_agencia') && 
+            $canSeeAgencia = $user->hasPermission('solicitudes_ver_agencia') &&
                             $solicitud->agencia_id == $user->id_agencia;
-                            
-            $canSeeCumplimiento = $user->hasPermission('solicitudes_ver_cumplimiento') && 
+
+            $canSeeCumplimiento = $user->hasPermission('solicitudes_ver_cumplimiento') &&
                                  in_array($solicitud->destinatario, ['cumplimiento', 'ambos']);
-                                 
+
             if (!$canSeeAgencia && !$canSeeCumplimiento) {
                 return response()->json(['message' => 'No tiene permiso para ver esta solicitud.'], 403);
             }
@@ -179,7 +179,8 @@ class BandejaSolicitudesController extends Controller
                 $solicitud->mensaje_rechazadoC = $request->comentario;
             }
             $solicitud->estado_cumplimiento = $request->estado;
-            
+            $solicitud->user_cumplimiento_id = $user->id;
+
             if ($solicitud->destinatario === 'cumplimiento') {
                 $solicitud->estado_jefatura = $request->estado;
             }
@@ -194,6 +195,7 @@ class BandejaSolicitudesController extends Controller
                 $solicitud->mensaje_rechazadoJ = $request->comentario;
             }
             $solicitud->estado_jefatura = $request->estado;
+            $solicitud->user_jefatura_id = $user->id;
 
             if ($solicitud->destinatario === 'jefatura') {
                 $solicitud->estado_cumplimiento = $request->estado;
@@ -201,7 +203,7 @@ class BandejaSolicitudesController extends Controller
         }
 
         $solicitud->autorizacion_completa = (
-            $solicitud->estado_cumplimiento === 'autorizado' && 
+            $solicitud->estado_cumplimiento === 'autorizado' &&
             $solicitud->estado_jefatura === 'autorizado'
         );
 
@@ -217,27 +219,190 @@ class BandejaSolicitudesController extends Controller
     /**
      * Descargar el PDF asociado
      */
-    public function descargarPDF($id)
+    public function descargarPDF(Request $request, $id)
     {
         $user = Auth::user();
-        $solicitud = SolicitudAutorizacion::findOrFail($id);
+        $solicitud = SolicitudAutorizacion::with(['userCumplimiento', 'userJefatura'])->findOrFail($id);
 
         // Permitir si es Super Admin, tiene permiso de descarga O tiene permiso de ver la solicitud
         $hasDownloadPerm = $user->hasPermission('solicitudes_descargar_pdf');
         $canSeeTodo = $user->hasPermission('solicitudes_ver_todo');
-        $canSeeAgencia = $user->hasPermission('solicitudes_ver_agencia') && 
+        $canSeeAgencia = $user->hasPermission('solicitudes_ver_agencia') &&
                          $solicitud->agencia_id == $user->id_agencia;
-        $canSeeCumplimiento = $user->hasPermission('solicitudes_ver_cumplimiento') && 
+        $canSeeCumplimiento = $user->hasPermission('solicitudes_ver_cumplimiento') &&
                               in_array($solicitud->destinatario, ['cumplimiento', 'ambos']);
 
         if (!$user->hasRole('Super Admin') && !$hasDownloadPerm && !$canSeeTodo && !$canSeeAgencia && !$canSeeCumplimiento) {
             return response()->json(['message' => 'No tiene permisos para acceder a este documento.'], 403);
+        }
+        if ($request->has('debug')) {
+            return response()->json([
+                'id' => $solicitud->id,
+                'autorizacion_completa' => $solicitud->autorizacion_completa,
+                'pdf_path' => $solicitud->pdf_path,
+                'exists' => File::exists(public_path($solicitud->pdf_path)),
+                'class_fpdi_exists' => class_exists('setasign\Fpdi\Fpdi'),
+                'class_fpdf_exists' => class_exists('Fpdf\Fpdf'),
+            ]);
         }
 
         $rutaCompleta = public_path($solicitud->pdf_path);
 
         if (!File::exists($rutaCompleta)) {
             return response()->json(['message' => 'Archivo no encontrado.'], 404);
+        }
+
+        \Illuminate\Support\Facades\Log::info("descargarPDF Solicitud: " . $solicitud->id . ", autorizacion_completa: " . json_encode($solicitud->autorizacion_completa));
+
+        // Si la autorización está completa, generamos el PDF con el dictamen estampado en una nueva página
+        if ($solicitud->autorizacion_completa) {
+            try {
+                if (!class_exists('FPDF') && class_exists('Fpdf\Fpdf')) {
+                    class_alias('Fpdf\Fpdf', 'FPDF');
+                }
+                $pdf = new \setasign\Fpdi\Fpdi();
+                $pdf->SetAutoPageBreak(false);
+                $pageCount = $pdf->setSourceFile($rutaCompleta);
+                for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+                    $templateId = $pdf->importPage($pageNo);
+                    $size = $pdf->getTemplateSize($templateId);
+                    $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                    $pdf->useTemplate($templateId);
+
+                    // Si es la última página, estampamos los dictámenes al final de esta página (arriba del footer)
+                    if ($pageNo === $pageCount) {
+                        $boxHeight = 30;
+                        $currentY = $size['height'] - 78; // 78 mm desde el fondo, para quedar arriba del footer
+
+                        $leftMargin = 12;
+                        $rightMargin = 12;
+                        $gap = 6;
+                        $destinatario = $solicitud->destinatario;
+
+                        // Nombre de quien autorizó
+                        $userC = $solicitud->userCumplimiento->name ?? 'Auditor de Cumplimiento';
+                        $msgC = $solicitud->mensaje_autorizacionC ?? 'Autorizado sin comentarios adicionales.';
+
+                        $userJ = $solicitud->userJefatura->name ?? 'Jefe de Agencia';
+                        $msgJ = $solicitud->mensaje_autorizacionJ ?? 'Autorizado sin comentarios adicionales.';
+
+                        if ($destinatario === 'ambos') {
+                            $width = ($size['width'] - $leftMargin - $rightMargin - $gap) / 2;
+
+                            // 1. Caja Cumplimiento (Izquierda)
+                            $pdf->SetDrawColor(229, 231, 235); // Borde gris claro (#e5e7eb)
+                            $pdf->SetFillColor(249, 250, 251); // Fondo suave (#f9fafb)
+                            $pdf->Rect($leftMargin, $currentY, $width, $boxHeight, 'DF');
+
+                            // Barra lateral verde
+                            $pdf->SetFillColor(16, 185, 129); // Verde
+                            $pdf->Rect($leftMargin, $currentY, 3, $boxHeight, 'F');
+
+                            $pdf->SetFont('Helvetica', 'B', 8);
+                            $pdf->SetTextColor(16, 185, 129);
+                            $pdf->SetXY($leftMargin + 5, $currentY + 3);
+                            $pdf->Cell($width - 8, 4, utf8_decode("CUMPLIMIENTO - AUTORIZADO"), 0, 1, 'L');
+
+                            $pdf->SetFont('Helvetica', 'B', 7);
+                            $pdf->SetTextColor(75, 85, 99);
+                            $pdf->SetXY($leftMargin + 5, $currentY + 8);
+                            $pdf->Cell($width - 8, 4, utf8_decode("Autorizado por: " . $userC), 0, 1, 'L');
+
+                            $pdf->SetFont('Helvetica', '', 7);
+                            $pdf->SetTextColor(31, 41, 55);
+                            $pdf->SetXY($leftMargin + 5, $currentY + 13);
+                            $pdf->MultiCell($width - 8, 3.5, utf8_decode($msgC), 0, 'L');
+
+                            // 2. Caja Jefatura (Derecha)
+                            $pdf->SetDrawColor(229, 231, 235);
+                            $pdf->SetFillColor(249, 250, 251);
+                            $pdf->Rect($leftMargin + $width + $gap, $currentY, $width, $boxHeight, 'DF');
+
+                            // Barra lateral azul
+                            $pdf->SetFillColor(1, 61, 123); // Azul Cope (#013d7b)
+                            $pdf->Rect($leftMargin + $width + $gap, $currentY, 3, $boxHeight, 'F');
+
+                            $pdf->SetFont('Helvetica', 'B', 8);
+                            $pdf->SetTextColor(1, 61, 123);
+                            $pdf->SetXY($leftMargin + $width + $gap + 5, $currentY + 3);
+                            $pdf->Cell($width - 8, 4, utf8_decode("JEFE DE AGENCIA - AUTORIZADO"), 0, 1, 'L');
+
+                            $pdf->SetFont('Helvetica', 'B', 7);
+                            $pdf->SetTextColor(75, 85, 99);
+                            $pdf->SetXY($leftMargin + $width + $gap + 5, $currentY + 8);
+                            $pdf->Cell($width - 8, 4, utf8_decode("Autorizado por: " . $userJ), 0, 1, 'L');
+
+                            $pdf->SetFont('Helvetica', '', 7);
+                            $pdf->SetTextColor(31, 41, 55);
+                            $pdf->SetXY($leftMargin + $width + $gap + 5, $currentY + 13);
+                            $pdf->MultiCell($width - 8, 3.5, utf8_decode($msgJ), 0, 'L');
+
+                        } else {
+                            // Un solo bloque con todo el ancho disponible
+                            $width = $size['width'] - $leftMargin - $rightMargin;
+
+                            $pdf->SetDrawColor(229, 231, 235);
+                            $pdf->SetFillColor(249, 250, 251);
+                            $pdf->Rect($leftMargin, $currentY, $width, $boxHeight, 'DF');
+
+                            if ($destinatario === 'cumplimiento') {
+                                // Barra lateral verde
+                                $pdf->SetFillColor(16, 185, 129);
+                                $pdf->Rect($leftMargin, $currentY, 3, $boxHeight, 'F');
+
+                                $pdf->SetFont('Helvetica', 'B', 8);
+                                $pdf->SetTextColor(16, 185, 129);
+                                $pdf->SetXY($leftMargin + 5, $currentY + 3);
+                                $pdf->Cell($width - 8, 4, utf8_decode("CUMPLIMIENTO - AUTORIZADO"), 0, 1, 'L');
+
+                                $pdf->SetFont('Helvetica', 'B', 7);
+                                $pdf->SetTextColor(75, 85, 99);
+                                $pdf->SetXY($leftMargin + 5, $currentY + 8);
+                                $pdf->Cell($width - 8, 4, utf8_decode("Autorizado por: " . $userC), 0, 1, 'L');
+
+                                $pdf->SetFont('Helvetica', '', 7);
+                                $pdf->SetTextColor(31, 41, 55);
+                                $pdf->SetXY($leftMargin + 5, $currentY + 13);
+                                $pdf->MultiCell($width - 8, 3.5, utf8_decode($msgC), 0, 'L');
+                            } else {
+                                // Barra lateral azul
+                                $pdf->SetFillColor(1, 61, 123);
+                                $pdf->Rect($leftMargin, $currentY, 3, $boxHeight, 'F');
+
+                                $pdf->SetFont('Helvetica', 'B', 8);
+                                $pdf->SetTextColor(1, 61, 123);
+                                $pdf->SetXY($leftMargin + 5, $currentY + 3);
+                                $pdf->Cell($width - 8, 4, utf8_decode("JEFATURA DE AGENCIA - AUTORIZADO"), 0, 1, 'L');
+
+                                $pdf->SetFont('Helvetica', 'B', 7);
+                                $pdf->SetTextColor(75, 85, 99);
+                                $pdf->SetXY($leftMargin + 5, $currentY + 8);
+                                $pdf->Cell($width - 8, 4, utf8_decode("Autorizado por: " . $userJ), 0, 1, 'L');
+
+                                $pdf->SetFont('Helvetica', '', 7);
+                                $pdf->SetTextColor(31, 41, 55);
+                                $pdf->SetXY($leftMargin + 5, $currentY + 13);
+                                $pdf->MultiCell($width - 8, 3.5, utf8_decode($msgJ), 0, 'L');
+                            }
+                        }
+
+                        // Sello o pie de página discreto
+                        $pdf->SetFont('Helvetica', 'I', 6);
+                        $pdf->SetTextColor(156, 163, 175);
+                        $pdf->SetXY($leftMargin, $currentY + $boxHeight + 1.5);
+                        $pdf->Cell($size['width'] - $leftMargin - $rightMargin, 5, utf8_decode("Resolución de autorización de riesgo #" . $solicitud->id . " vinculada a este expediente."), 0, 0, 'C');
+                    }
+                }
+
+                return response($pdf->Output('S'), 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'attachment; filename="Autorizacion_' . $id . '.pdf"'
+                ]);
+            } catch (\Exception $e) {
+                // Si falla por algún motivo FPDI, retornamos el archivo original para que no se bloquee el flujo
+                \Illuminate\Support\Facades\Log::error("Error al estampar PDF: " . $e->getMessage());
+                return response()->download($rutaCompleta);
+            }
         }
 
         return response()->download($rutaCompleta);

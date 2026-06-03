@@ -23,6 +23,8 @@ class SolicitudAutorizacion extends Model
         'estado_cumplimiento',
         'estado_jefatura',
         'autorizacion_completa',
+        'user_cumplimiento_id',
+        'user_jefatura_id',
     ];
 
     public function usuario()
@@ -33,6 +35,16 @@ class SolicitudAutorizacion extends Model
     public function agencia()
     {
         return $this->belongsTo(Agencia::class, 'agencia_id');
+    }
+
+    public function userCumplimiento()
+    {
+        return $this->belongsTo(User::class, 'user_cumplimiento_id');
+    }
+
+    public function userJefatura()
+    {
+        return $this->belongsTo(User::class, 'user_jefatura_id');
     }
 
     public function getPuedeDescargarAttribute()
