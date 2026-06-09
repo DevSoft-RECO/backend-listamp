@@ -58,4 +58,10 @@ Route::middleware('sso')->group(function () {
 
 });
 
-
+// ==========================================
+// === BACKUP SYSTEM ===
+// Endpoints internos para el sistema de respaldos de la Madre
+// ==========================================
+Route::post('/internal/backup', [\App\Http\Controllers\InternalBackupController::class, 'generate']);
+Route::get('/internal/download-backup', [\App\Http\Controllers\InternalBackupController::class, 'download']);
+Route::delete('/internal/backup', [\App\Http\Controllers\InternalBackupController::class, 'deleteFile']);
