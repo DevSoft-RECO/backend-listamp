@@ -271,20 +271,13 @@ class BandejaSolicitudesController extends Controller
 
                     // Si es la última página, estampamos los dictámenes al final de esta página (arriba del footer)
                     if ($pageNo === $pageCount) {
-                        $boxHeight = 30;
-                        $currentY = $size['height'] - 78; // 78 mm desde el fondo, para quedar arriba del footer
+                        $boxHeight = 12;
+                        $currentY = $size['height'] - 60; // Para mantener la misma alineación inferior que antes
 
                         $leftMargin = 12;
                         $rightMargin = 12;
                         $gap = 6;
                         $destinatario = $solicitud->destinatario;
-
-                        // Nombre de quien autorizó
-                        $userC = $solicitud->userCumplimiento->name ?? 'Auditor de Cumplimiento';
-                        $msgC = $solicitud->mensaje_autorizacionC ?? 'Autorizado sin comentarios adicionales.';
-
-                        $userJ = $solicitud->userJefatura->name ?? 'Jefe de Agencia';
-                        $msgJ = $solicitud->mensaje_autorizacionJ ?? 'Autorizado sin comentarios adicionales.';
 
                         if ($destinatario === 'ambos') {
                             $width = ($size['width'] - $leftMargin - $rightMargin - $gap) / 2;
@@ -300,18 +293,8 @@ class BandejaSolicitudesController extends Controller
 
                             $pdf->SetFont('Helvetica', 'B', 8);
                             $pdf->SetTextColor(16, 185, 129);
-                            $pdf->SetXY($leftMargin + 5, $currentY + 3);
+                            $pdf->SetXY($leftMargin + 5, $currentY + 4);
                             $pdf->Cell($width - 8, 4, utf8_decode("CUMPLIMIENTO - AUTORIZADO"), 0, 1, 'L');
-
-                            $pdf->SetFont('Helvetica', 'B', 7);
-                            $pdf->SetTextColor(75, 85, 99);
-                            $pdf->SetXY($leftMargin + 5, $currentY + 8);
-                            $pdf->Cell($width - 8, 4, utf8_decode("Autorizado por: " . $userC), 0, 1, 'L');
-
-                            $pdf->SetFont('Helvetica', '', 7);
-                            $pdf->SetTextColor(31, 41, 55);
-                            $pdf->SetXY($leftMargin + 5, $currentY + 13);
-                            $pdf->MultiCell($width - 8, 3.5, utf8_decode($msgC), 0, 'L');
 
                             // 2. Caja Jefatura (Derecha)
                             $pdf->SetDrawColor(229, 231, 235);
@@ -324,18 +307,8 @@ class BandejaSolicitudesController extends Controller
 
                             $pdf->SetFont('Helvetica', 'B', 8);
                             $pdf->SetTextColor(1, 61, 123);
-                            $pdf->SetXY($leftMargin + $width + $gap + 5, $currentY + 3);
+                            $pdf->SetXY($leftMargin + $width + $gap + 5, $currentY + 4);
                             $pdf->Cell($width - 8, 4, utf8_decode("JEFE DE AGENCIA - AUTORIZADO"), 0, 1, 'L');
-
-                            $pdf->SetFont('Helvetica', 'B', 7);
-                            $pdf->SetTextColor(75, 85, 99);
-                            $pdf->SetXY($leftMargin + $width + $gap + 5, $currentY + 8);
-                            $pdf->Cell($width - 8, 4, utf8_decode("Autorizado por: " . $userJ), 0, 1, 'L');
-
-                            $pdf->SetFont('Helvetica', '', 7);
-                            $pdf->SetTextColor(31, 41, 55);
-                            $pdf->SetXY($leftMargin + $width + $gap + 5, $currentY + 13);
-                            $pdf->MultiCell($width - 8, 3.5, utf8_decode($msgJ), 0, 'L');
 
                         } else {
                             // Un solo bloque con todo el ancho disponible
@@ -352,18 +325,8 @@ class BandejaSolicitudesController extends Controller
 
                                 $pdf->SetFont('Helvetica', 'B', 8);
                                 $pdf->SetTextColor(16, 185, 129);
-                                $pdf->SetXY($leftMargin + 5, $currentY + 3);
+                                $pdf->SetXY($leftMargin + 5, $currentY + 4);
                                 $pdf->Cell($width - 8, 4, utf8_decode("CUMPLIMIENTO - AUTORIZADO"), 0, 1, 'L');
-
-                                $pdf->SetFont('Helvetica', 'B', 7);
-                                $pdf->SetTextColor(75, 85, 99);
-                                $pdf->SetXY($leftMargin + 5, $currentY + 8);
-                                $pdf->Cell($width - 8, 4, utf8_decode("Autorizado por: " . $userC), 0, 1, 'L');
-
-                                $pdf->SetFont('Helvetica', '', 7);
-                                $pdf->SetTextColor(31, 41, 55);
-                                $pdf->SetXY($leftMargin + 5, $currentY + 13);
-                                $pdf->MultiCell($width - 8, 3.5, utf8_decode($msgC), 0, 'L');
                             } else {
                                 // Barra lateral azul
                                 $pdf->SetFillColor(1, 61, 123);
@@ -371,18 +334,8 @@ class BandejaSolicitudesController extends Controller
 
                                 $pdf->SetFont('Helvetica', 'B', 8);
                                 $pdf->SetTextColor(1, 61, 123);
-                                $pdf->SetXY($leftMargin + 5, $currentY + 3);
+                                $pdf->SetXY($leftMargin + 5, $currentY + 4);
                                 $pdf->Cell($width - 8, 4, utf8_decode("JEFATURA DE AGENCIA - AUTORIZADO"), 0, 1, 'L');
-
-                                $pdf->SetFont('Helvetica', 'B', 7);
-                                $pdf->SetTextColor(75, 85, 99);
-                                $pdf->SetXY($leftMargin + 5, $currentY + 8);
-                                $pdf->Cell($width - 8, 4, utf8_decode("Autorizado por: " . $userJ), 0, 1, 'L');
-
-                                $pdf->SetFont('Helvetica', '', 7);
-                                $pdf->SetTextColor(31, 41, 55);
-                                $pdf->SetXY($leftMargin + 5, $currentY + 13);
-                                $pdf->MultiCell($width - 8, 3.5, utf8_decode($msgJ), 0, 'L');
                             }
                         }
 
