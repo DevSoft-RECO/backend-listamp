@@ -41,6 +41,7 @@ Route::middleware('sso')->group(function () {
     // 📥 Bandeja de Solicitudes (Autorizaciones)
     Route::prefix('solicitudes')->group(function () {
         Route::get('/', [\App\Http\Controllers\Solicitudes\BandejaSolicitudesController::class, 'getSolicitudes']);
+        Route::get('/exportar', [\App\Http\Controllers\Solicitudes\BandejaSolicitudesController::class, 'exportarReporte']);
         Route::get('/{id}', [\App\Http\Controllers\Solicitudes\BandejaSolicitudesController::class, 'show']);
         Route::post('/{id}/actualizar-estado', [\App\Http\Controllers\Solicitudes\BandejaSolicitudesController::class, 'actualizarEstado']);
         Route::get('/{id}/descargar-pdf', [\App\Http\Controllers\Solicitudes\BandejaSolicitudesController::class, 'descargarPDF']);

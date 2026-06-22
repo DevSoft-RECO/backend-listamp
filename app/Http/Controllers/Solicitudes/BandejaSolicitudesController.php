@@ -122,6 +122,174 @@ class BandejaSolicitudesController extends Controller
     }
 
     /**
+     * Exportar el listado de solicitudes a CSV con filtros y detalles
+     */
+    public function exportarReporte(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user->hasRole('Super Admin') && !$user->hasPermission('reporte_solicitudes')) {
+            return response()->json(['message' => 'No tiene permisos para exportar este reporte.'], 403);
+        }
+
+        $tipo = $request->input('tipo', 'pendientes');
+        $destinatario = $request->input('destinatario');
+        $fechaInicio = $request->input('fecha_inicio');
+        $fechaFin = $request->input('fecha_fin');
+
+        $query = SolicitudAutorizacion::with(['usuario', 'agencia', 'userCumplimiento', 'userJefatura']);
+
+        // 1. Filtrar por tipo (estado)
+        if ($tipo === 'pendientes') {
+            $query->where(function ($q) {
+                $q->where(function($sq) {
+                    $sq->whereNull('estado_cumplimiento')->orWhere('estado_cumplimiento', 'pendiente');
+                })
+                ->orWhere(function($sq) {
+                    $sq->whereNull('estado_jefatura')->orWhere('estado_jefatura', 'pendiente');
+                });
+            });
+
+            $query->where(function ($q) use ($user) {
+                if ($user->hasPermission('solicitudes_autorizar_cumplimiento') || $user->hasRole('Super Admin')) {
+                    $q->orWhereIn('destinatario', ['cumplimiento', 'ambos']);
+                }
+                if ($user->hasPermission('solicitudes_autorizar_jefatura') || $user->hasPermission('solicitudes_ver_agencia') || $user->hasRole('Super Admin')) {
+                    $q->orWhere('agencia_id', $user->id_agencia);
+                }
+                if ($user->hasPermission('solicitudes_ver_todo') || $user->hasRole('Super Admin')) {
+                    $q->orWhereRaw('1 = 1');
+                }
+            });
+        } elseif ($tipo === 'agencia') {
+            if (!$user->hasRole('Super Admin') && !$user->hasPermission('solicitudes_ver_agencia')) {
+                return response()->json(['message' => 'No tiene permiso para ver el monitoreo de agencia.'], 403);
+            }
+            if (!$user->hasRole('Super Admin')) {
+                $query->where('agencia_id', $user->id_agencia);
+            }
+        } elseif ($tipo === 'autorizadas') {
+            $query->where('estado_cumplimiento', 'autorizado')
+                  ->where('estado_jefatura', 'autorizado');
+        } elseif ($tipo === 'rechazadas') {
+            $query->where(function ($q) {
+                $q->where(function($sq) {
+                    $sq->whereNotNull('estado_cumplimiento')->where('estado_cumplimiento', '!=', 'pendiente');
+                })
+                ->where(function($sq) {
+                    $sq->whereNotNull('estado_jefatura')->where('estado_jefatura', '!=', 'pendiente');
+                })
+                ->where(function ($sq) {
+                    $sq->where('estado_cumplimiento', 'rechazado')
+                      ->orWhere('estado_jefatura', 'rechazado');
+                });
+            });
+        }
+
+        // 2. Filtros opcionales
+        if (!empty($destinatario) && $destinatario !== 'todos') {
+            $query->where('destinatario', $destinatario);
+        }
+
+        if ($fechaInicio && $fechaFin) {
+            $query->whereBetween('created_at', [
+                Carbon::parse($fechaInicio)->startOfDay(),
+                Carbon::parse($fechaFin)->endOfDay()
+            ]);
+        }
+
+        // 3. Permisos y Roles
+        if (!$user->hasRole('Super Admin') && !$user->hasPermission('solicitudes_ver_todo')) {
+            $query->where(function($q) use ($user) {
+                $hasVisibility = false;
+                if ($user->hasPermission('solicitudes_ver_agencia')) {
+                    $q->orWhere('agencia_id', $user->id_agencia);
+                    $hasVisibility = true;
+                }
+                if ($user->hasPermission('solicitudes_ver_cumplimiento')) {
+                    $q->orWhereIn('destinatario', ['cumplimiento', 'ambos']);
+                    $hasVisibility = true;
+                }
+                if (!$hasVisibility) {
+                    $q->whereRaw('1 = 0');
+                }
+            });
+        }
+
+        $registros = $query->latest()->get();
+
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=reporte_solicitudes.csv",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $columns = [
+            'ID', 
+            'Solicitante', 
+            'Agencia', 
+            'Destinatario', 
+            'Fecha Solicitud', 
+            'Observacion para Cumplimiento', 
+            'Observacion para Jefatura', 
+            'Estado Cumplimiento', 
+            'Responsable Cumplimiento', 
+            'Comentario Cumplimiento', 
+            'Estado Jefatura', 
+            'Responsable Jefatura', 
+            'Comentario Jefatura', 
+            'Autorizacion Completa'
+        ];
+
+        $callback = function() use($registros, $columns) {
+            $file = fopen('php://output', 'w');
+            
+            // UTF-8 BOM
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            fputcsv($file, $columns);
+
+            foreach ($registros as $r) {
+                $comentarioC = '';
+                if ($r->estado_cumplimiento === 'autorizado') {
+                    $comentarioC = $r->mensaje_autorizacionC;
+                } elseif ($r->estado_cumplimiento === 'rechazado') {
+                    $comentarioC = $r->mensaje_rechazadoC;
+                }
+
+                $comentarioJ = '';
+                if ($r->estado_jefatura === 'autorizado') {
+                    $comentarioJ = $r->mensaje_autorizacionJ;
+                } elseif ($r->estado_jefatura === 'rechazado') {
+                    $comentarioJ = $r->mensaje_rechazadoJ;
+                }
+
+                fputcsv($file, [
+                    $r->id,
+                    $r->usuario->name ?? 'N/A',
+                    $r->agencia->nombre ?? 'Sin Agencia',
+                    strtoupper($r->destinatario),
+                    $r->created_at ? $r->created_at->format('d/m/Y H:i:s') : 'N/A',
+                    $r->observacion_cumplimiento,
+                    $r->observacion_jefatura,
+                    strtoupper($r->estado_cumplimiento ?? 'pendiente'),
+                    $r->userCumplimiento->name ?? 'N/A',
+                    $comentarioC,
+                    strtoupper($r->estado_jefatura ?? 'pendiente'),
+                    $r->userJefatura->name ?? 'N/A',
+                    $comentarioJ,
+                    $r->autorizacion_completa ? 'SI' : 'NO'
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
      * Ver detalle de una solicitud
      */
     public function show($id)
